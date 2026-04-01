@@ -1,0 +1,61 @@
+import streamlit as st
+import requests
+
+st.set_page_config(page_title="NIFTY AI PRO", layout="centered")
+
+URL = "https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY"
+
+headers = {
+    "User-Agent": "Mozilla/5.0",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+session = requests.Session()
+session.get("https://www.nseindia.com", headers=headers)
+
+def get_data():
+    data = session.get(URL, headers=headers).json()
+    records = data['records']['data']
+    spot = data['records']['underlyingValue']
+
+    call_oi = put_oi = call_chg = put_chg = 0
+
+    for d in records:
+        if 'CE' in d and 'PE' in d:
+            call_oi += d['CE']['openInterest']
+            put_oi += d['PE']['openInterest']
+            call_chg += d['CE']['changeinOpenInterest']
+            put_chg += d['PE']['changeinOpenInterest']
+
+    pcr = put_oi / call_oi if call_oi else 0
+
+    if put_chg > call_chg and pcr > 1:
+        signal = "🟢 TOP CLASS BUY"
+        sl = spot - 40
+        t1 = spot + 40
+        t2 = spot + 80
+    elif call_chg > put_chg and pcr < 1:
+        signal = "🔴 TOP CLASS SELL"
+        sl = spot + 40
+        t1 = spot - 40
+        t2 = spot - 80
+    else:
+        signal = "❌ NO TRADE"
+        sl = t1 = t2 = 0
+
+    return spot, round(pcr,2), signal, sl, t1, t2
+
+spot, pcr, signal, sl, t1, t2 = get_data()
+
+st.title("🔥 NIFTY AI PRO DASHBOARD")
+
+st.metric("NIFTY", spot)
+st.metric("PCR", pcr)
+
+st.subheader(signal)
+
+if "BUY" in signal or "SELL" in signal:
+    st.write(f"🎯 Target: {t1} / {t2}")
+    st.write(f"🛑 SL: {sl}")
+
+st.caption("Live NSE OI Data | Auto Refresh")
